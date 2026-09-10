@@ -1,0 +1,31 @@
+name: lingualines
+description: Save English sentences, hear offline pronunciation, and practice them with a gamified system.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  path_provider: ^2.1.2
+  flutter_tts: ^4.0.2
+  just_audio: ^0.9.40
+  uuid: ^4.3.3
+  provider: ^6.1.2
+  intl: ^0.19.0
+  record: ^5.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/audio/
