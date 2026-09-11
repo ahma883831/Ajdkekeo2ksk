@@ -8,7 +8,8 @@ import '../services/gamification_service.dart';
 
 class AddEditSentenceScreen extends StatefulWidget {
   final Sentence? existing;
-  const AddEditSentenceScreen({super.key, this.existing});
+  final String initialFolder;
+  const AddEditSentenceScreen({super.key, this.existing, this.initialFolder = ''});
 
   @override
   State<AddEditSentenceScreen> createState() => _AddEditSentenceScreenState();
@@ -24,7 +25,7 @@ class _AddEditSentenceScreenState extends State<AddEditSentenceScreen> {
     super.initState();
     _textCtrl = TextEditingController(text: widget.existing?.text ?? '');
     _meaningCtrl = TextEditingController(text: widget.existing?.meaning ?? '');
-    _folderCtrl = TextEditingController(text: widget.existing?.folder ?? '');
+    _folderCtrl = TextEditingController(text: widget.existing?.folder ?? widget.initialFolder);
   }
 
   @override
