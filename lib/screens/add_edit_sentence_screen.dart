@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/sentence.dart';
 import '../repositories/sentence_repository.dart';
 import '../services/tts_service.dart';
+import '../services/translation_service.dart';
 import '../services/gamification_service.dart';
 
 class AddEditSentenceScreen extends StatefulWidget {
@@ -19,6 +20,8 @@ class _AddEditSentenceScreenState extends State<AddEditSentenceScreen> {
   late final TextEditingController _textCtrl;
   late final TextEditingController _meaningCtrl;
   late final TextEditingController _folderCtrl;
+  bool _translating = false;
+  String? _translationStatus;
 
   @override
   void initState() {
@@ -36,10 +39,70 @@ class _AddEditSentenceScreenState extends State<AddEditSentenceScreen> {
     super.dispose();
   }
 
+  Future<void> _autoTranslate() async {
+    if (_textCtrl.text.trim().isEmpty) return;
+    final translator = context.read<TranslationService>();
+    setState(() {
+      _translating = true;
+      _translationStatus = null;
+    });
+    try {
+      await translator.ensureModelsDownloaded(
+        onProgress: (status) => setState(() => _translationStatus = status),
+      );
+      final result = await translator.translateToPersian(_textCtrl.text.trim());
+      setState(() => _meaningCtrl.text = result);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ترجمه ناموفق بود. دوباره امتحان کن.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _translating = false;
+          _translationStatus = null;
+        });
+      }
+    }
+  }
+
   Future<void> _save() async {
-    if (_textCtrl.text.trim().isEmpty || _meaningCtrl.text.trim().isEmpty) return;
+    if (_textCtrl.text.trim().isEmpty) return;
     final repo = context.read<SentenceRepository>();
     final gamification = context.read<GamificationService>();
+    final translator = context.read<TranslationService>();
+
+    // If the user left the meaning blank, translate automatically before saving.
+    if (_meaningCtrl.text.trim().isEmpty) {
+      setState(() {
+        _translating = true;
+        _translationStatus = 'در حال ترجمه خودکار...';
+      });
+      try {
+        await translator.ensureModelsDownloaded(
+          onProgress: (status) => setState(() => _translationStatus = status),
+        );
+        final result = await translator.translateToPersian(_textCtrl.text.trim());
+        setState(() => _meaningCtrl.text = result);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ترجمه خودکار ناموفق بود. معنی رو دستی بنویس.')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _translating = false;
+            _translationStatus = null;
+          });
+        }
+      }
+    }
+
+    if (_meaningCtrl.text.trim().isEmpty) return; // still empty (translation failed)
 
     if (widget.existing != null) {
       widget.existing!
@@ -88,11 +151,27 @@ class _AddEditSentenceScreenState extends State<AddEditSentenceScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _translating ? null : _autoTranslate,
+                icon: _translating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.translate_rounded),
+                label: Text(_translating
+                    ? (_translationStatus ?? 'در حال ترجمه...')
+                    : 'پیش‌نمایش ترجمه'),
+              ),
+            ),
             TextField(
               controller: _meaningCtrl,
               maxLines: 3,
               decoration: const InputDecoration(
-                labelText: 'Meaning / translation',
+                labelText: 'Meaning / translation (خالی بذار تا خودکار پر بشه)',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -124,8 +203,10 @@ class _AddEditSentenceScreenState extends State<AddEditSentenceScreen> {
             }),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _save,
-              child: Text(isEditing ? 'Save Changes' : 'Add Sentence'),
+              onPressed: _translating ? null : _save,
+              child: _translating
+                  ? const Text('در حال ترجمه...')
+                  : Text(isEditing ? 'Save Changes' : 'Add Sentence'),
             ),
           ],
         ),
