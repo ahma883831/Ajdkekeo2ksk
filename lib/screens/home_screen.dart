@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/sentence.dart';
 import '../repositories/sentence_repository.dart';
-import '../services/tts_service.dart';
+import '../repositories/folder_repository.dart';
 import '../theme/app_theme.dart';
-import 'add_edit_sentence_screen.dart';
-import 'sentence_detail_screen.dart';
-import 'practice_hub_screen.dart';
+import 'folder_detail_screen.dart';
 import 'stats_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,20 +15,58 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _query = '';
+  Future<void> _createFolder() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Folder'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Folder name, e.g. Idioms'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty) {
+      await context.read<FolderRepository>().create(name);
+      setState(() {});
+    }
+  }
+
+  Future<void> _deleteFolder(String name) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Folder?'),
+        content: Text(
+            'Delete "$name"? Sentences inside will move to Uncategorized, not be deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await context.read<FolderRepository>().delete(name);
+      setState(() {});
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final repo = context.read<SentenceRepository>();
-    final tts = context.read<TtsService>();
-    final all = repo.getAll();
-    final filtered = _query.isEmpty
-        ? all
-        : all
-            .where((s) =>
-                s.text.toLowerCase().contains(_query.toLowerCase()) ||
-                s.meaning.toLowerCase().contains(_query.toLowerCase()))
-            .toList();
+    final sentenceRepo = context.read<SentenceRepository>();
+    final folderRepo = context.read<FolderRepository>();
+    final folders = folderRepo.getAll();
+    final totalCount = sentenceRepo.count;
+    final uncategorizedCount = sentenceRepo.getByFolder('').length;
 
     return Scaffold(
       appBar: AppBar(
@@ -39,135 +74,141 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.bar_chart_rounded),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const StatsScreen()),
-            ),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const StatsScreen()),
+              );
+              setState(() {});
+            },
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AddEditSentenceScreen()),
-          );
-          setState(() {});
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Sentence'),
+        onPressed: _createFolder,
+        icon: const Icon(Icons.create_new_folder_rounded),
+        label: const Text('Folder'),
       ),
-      body: Column(
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search sentences...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: AppTheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
+          _FolderTile(
+            icon: Icons.all_inbox_rounded,
+            color: AppTheme.neonCyan,
+            title: 'All Sentences',
+            subtitle: '$totalCount sentence(s)',
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const FolderDetailScreen(folderFilter: null, title: 'All Sentences'),
                 ),
-              ),
-              onChanged: (v) => setState(() => _query = v),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.play_circle_fill),
-                label: const Text('Start Practice'),
-                onPressed: all.isEmpty
-                    ? null
-                    : () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const PracticeHubScreen()),
-                        ),
-              ),
-            ),
+              );
+              setState(() {});
+            },
           ),
           const SizedBox(height: 12),
-          Expanded(
-            child: filtered.isEmpty
-                ? Center(
-                    child: Text(
-                      all.isEmpty
-                          ? 'No sentences yet.\nTap "+ Sentence" to add your first one.'
-                          : 'No matches.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, i) {
-                      final s = filtered[i];
-                      return _SentenceTile(
-                        sentence: s,
-                        onSpeak: () => tts.speak(s.text),
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => SentenceDetailScreen(sentence: s),
-                            ),
-                          );
-                          setState(() {});
-                        },
-                        onDelete: () async {
-                          await repo.delete(s.id);
-                          setState(() {});
-                        },
-                      );
-                    },
-                  ),
+          _FolderTile(
+            icon: Icons.folder_open_rounded,
+            color: AppTheme.textSecondary,
+            title: 'Uncategorized',
+            subtitle: '$uncategorizedCount sentence(s)',
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const FolderDetailScreen(folderFilter: '', title: 'Uncategorized'),
+                ),
+              );
+              setState(() {});
+            },
           ),
+          const SizedBox(height: 20),
+          if (folders.isNotEmpty) ...[
+            Text('Your Folders', style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 10),
+          ],
+          ...folders.map((f) {
+            final count = sentenceRepo.getByFolder(f).length;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _FolderTile(
+                icon: Icons.folder_rounded,
+                color: AppTheme.neonPurple,
+                title: f,
+                subtitle: '$count sentence(s)',
+                onLongPress: () => _deleteFolder(f),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => FolderDetailScreen(folderFilter: f, title: f),
+                    ),
+                  );
+                  setState(() {});
+                },
+              ),
+            );
+          }),
+          if (folders.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 40),
+              child: Center(
+                child: Text(
+                  'No folders yet.\nTap "+ Folder" to create one, e.g. "Idioms" or "Travel".',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-class _SentenceTile extends StatelessWidget {
-  final Sentence sentence;
-  final VoidCallback onSpeak;
+class _FolderTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final VoidCallback? onLongPress;
 
-  const _SentenceTile({
-    required this.sentence,
-    required this.onSpeak,
+  const _FolderTile({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
     required this.onTap,
-    required this.onDelete,
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      key: ValueKey(sentence.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        child: const Icon(Icons.delete, color: Colors.redAccent),
-      ),
-      onDismissed: (_) => onDelete(),
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 10),
-        child: ListTile(
-          onTap: onTap,
-          title: Text(sentence.text, style: Theme.of(context).textTheme.bodyLarge),
-          subtitle: Text(sentence.meaning, style: Theme.of(context).textTheme.bodyMedium),
-          trailing: IconButton(
-            icon: const Icon(Icons.volume_up_rounded, color: AppTheme.neonCyan),
-            onPressed: onSpeak,
-          ),
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: AppTheme.glowCard(color),
+        child: Row(
+          children: [
+            Icon(icon, size: 36, color: color),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.bodyLarge),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: AppTheme.textSecondary),
+          ],
         ),
       ),
     );
