@@ -17,18 +17,21 @@ class AddEditSentenceScreen extends StatefulWidget {
 class _AddEditSentenceScreenState extends State<AddEditSentenceScreen> {
   late final TextEditingController _textCtrl;
   late final TextEditingController _meaningCtrl;
+  late final TextEditingController _folderCtrl;
 
   @override
   void initState() {
     super.initState();
     _textCtrl = TextEditingController(text: widget.existing?.text ?? '');
     _meaningCtrl = TextEditingController(text: widget.existing?.meaning ?? '');
+    _folderCtrl = TextEditingController(text: widget.existing?.folder ?? '');
   }
 
   @override
   void dispose() {
     _textCtrl.dispose();
     _meaningCtrl.dispose();
+    _folderCtrl.dispose();
     super.dispose();
   }
 
@@ -40,10 +43,15 @@ class _AddEditSentenceScreenState extends State<AddEditSentenceScreen> {
     if (widget.existing != null) {
       widget.existing!
         ..text = _textCtrl.text.trim()
-        ..meaning = _meaningCtrl.text.trim();
+        ..meaning = _meaningCtrl.text.trim()
+        ..folder = _folderCtrl.text.trim();
       await repo.update(widget.existing!);
     } else {
-      await repo.add(text: _textCtrl.text.trim(), meaning: _meaningCtrl.text.trim());
+      await repo.add(
+        text: _textCtrl.text.trim(),
+        meaning: _meaningCtrl.text.trim(),
+        folder: _folderCtrl.text.trim(),
+      );
       await gamification.onSentenceSaved(repo.count);
     }
     if (mounted) Navigator.pop(context);
@@ -87,6 +95,32 @@ class _AddEditSentenceScreenState extends State<AddEditSentenceScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: 24),
+            Builder(builder: (context) {
+              final repo = context.read<SentenceRepository>();
+              final folders = repo.getFolders();
+              return Autocomplete<String>(
+                optionsBuilder: (value) {
+                  if (value.text.isEmpty) return folders;
+                  return folders.where((f) => f.toLowerCase().contains(value.text.toLowerCase()));
+                },
+                initialValue: TextEditingValue(text: _folderCtrl.text),
+                fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+                  controller.text = _folderCtrl.text;
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: const InputDecoration(
+                      labelText: 'Folder / Category (e.g. Idioms, Travel) — optional',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.folder_outlined),
+                    ),
+                    onChanged: (v) => _folderCtrl.text = v,
+                  );
+                },
+                onSelected: (v) => setState(() => _folderCtrl.text = v),
+              );
+            }),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _save,
