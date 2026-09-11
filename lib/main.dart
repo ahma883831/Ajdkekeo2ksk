@@ -7,6 +7,7 @@ import 'models/user_progress.dart';
 import 'repositories/sentence_repository.dart';
 import 'repositories/folder_repository.dart';
 import 'services/tts_service.dart';
+import 'services/translation_service.dart';
 import 'services/background_music_service.dart';
 import 'services/gamification_service.dart';
 import 'theme/app_theme.dart';
@@ -39,6 +40,7 @@ class LinguaLinesApp extends StatelessWidget {
         Provider<SentenceRepository>(create: (_) => SentenceRepository()),
         Provider<FolderRepository>(create: (_) => FolderRepository()),
         Provider<TtsService>(create: (_) => TtsService()),
+        Provider<TranslationService>(create: (_) => TranslationService()),
         ChangeNotifierProvider<BackgroundMusicService>.value(value: backgroundMusic),
         ChangeNotifierProvider<GamificationService>(
           create: (_) => GamificationService(),
