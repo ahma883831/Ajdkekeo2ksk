@@ -12,6 +12,7 @@ class Sentence extends HiveObject {
   DateTime? lastReviewed;
   DateTime? nextReviewDate;
   int masteryLevel; // 0-5
+  String folder; // folder/category name, e.g. "Idioms", "Travel"; "" = uncategorized
 
   Sentence({
     required this.id,
@@ -23,6 +24,7 @@ class Sentence extends HiveObject {
     this.lastReviewed,
     this.nextReviewDate,
     this.masteryLevel = 0,
+    this.folder = '',
   })  : tags = tags ?? [],
         dateAdded = dateAdded ?? DateTime.now();
 
@@ -67,13 +69,14 @@ class SentenceAdapter extends TypeAdapter<Sentence> {
           ? null
           : DateTime.fromMillisecondsSinceEpoch(fields[7] as int),
       masteryLevel: fields[8] as int,
+      folder: fields[9] == null ? '' : fields[9] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, Sentence obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -91,6 +94,8 @@ class SentenceAdapter extends TypeAdapter<Sentence> {
       ..writeByte(7)
       ..write(obj.nextReviewDate?.millisecondsSinceEpoch)
       ..writeByte(8)
-      ..write(obj.masteryLevel);
+      ..write(obj.masteryLevel)
+      ..writeByte(9)
+      ..write(obj.folder);
   }
 }
