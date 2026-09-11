@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'models/sentence.dart';
 import 'models/user_progress.dart';
 import 'repositories/sentence_repository.dart';
+import 'repositories/folder_repository.dart';
 import 'services/tts_service.dart';
 import 'services/background_music_service.dart';
 import 'services/gamification_service.dart';
@@ -19,6 +20,7 @@ Future<void> main() async {
   Hive.registerAdapter(UserProgressAdapter());
   await Hive.openBox<Sentence>(SentenceRepository.boxName);
   await Hive.openBox<UserProgress>(GamificationService.boxName);
+  await Hive.openBox<String>(FolderRepository.boxName);
 
   final backgroundMusic = BackgroundMusicService();
   await backgroundMusic.init();
@@ -35,6 +37,7 @@ class LinguaLinesApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<SentenceRepository>(create: (_) => SentenceRepository()),
+        Provider<FolderRepository>(create: (_) => FolderRepository()),
         Provider<TtsService>(create: (_) => TtsService()),
         ChangeNotifierProvider<BackgroundMusicService>.value(value: backgroundMusic),
         ChangeNotifierProvider<GamificationService>(
