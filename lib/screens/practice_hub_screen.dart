@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/sentence.dart';
 import '../repositories/sentence_repository.dart';
 import '../services/gamification_service.dart';
 import '../theme/app_theme.dart';
@@ -12,32 +13,38 @@ import 'practice/fill_blank_screen.dart';
 import 'practice/speaking_screen.dart';
 
 class PracticeHubScreen extends StatelessWidget {
-  const PracticeHubScreen({super.key});
+  final List<Sentence>? sentences; // null = use all sentences from repo
+  final String title;
+  const PracticeHubScreen({super.key, this.sentences, this.title = 'Practice'});
 
   @override
   Widget build(BuildContext context) {
     final repo = context.read<SentenceRepository>();
     final gamification = context.watch<GamificationService>();
     final progress = gamification.progress;
-    final due = repo.dueForReview();
+    final scope = sentences ?? repo.getAll();
+    final due = sentences == null
+        ? repo.dueForReview()
+        : scope.where((s) =>
+            s.nextReviewDate == null || !s.nextReviewDate!.isAfter(DateTime.now())).toList();
 
     final modules = [
       _Module('Flashcards', Icons.style_rounded, AppTheme.neonPurple,
-          (ctx) => FlashcardScreen(sentences: due.isEmpty ? repo.getAll() : due)),
+          (ctx) => FlashcardScreen(sentences: due.isEmpty ? scope : due)),
       _Module('Listening', Icons.headphones_rounded, AppTheme.neonCyan,
-          (ctx) => ListeningScreen(sentences: repo.getAll())),
+          (ctx) => ListeningScreen(sentences: scope)),
       _Module('Meaning Quiz', Icons.quiz_rounded, AppTheme.neonPink,
-          (ctx) => QuizScreen(sentences: repo.getAll())),
+          (ctx) => QuizScreen(sentences: scope)),
       _Module('Dictation', Icons.keyboard_rounded, AppTheme.neonPurple,
-          (ctx) => DictationScreen(sentences: repo.getAll())),
+          (ctx) => DictationScreen(sentences: scope)),
       _Module('Fill the Blank', Icons.text_fields_rounded, AppTheme.neonCyan,
-          (ctx) => FillBlankScreen(sentences: repo.getAll())),
+          (ctx) => FillBlankScreen(sentences: scope)),
       _Module('Speaking', Icons.mic_rounded, AppTheme.neonPink,
-          (ctx) => SpeakingScreen(sentences: repo.getAll())),
+          (ctx) => SpeakingScreen(sentences: scope)),
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Practice')),
+      appBar: AppBar(title: Text(title)),
       body: Column(
         children: [
           Padding(
