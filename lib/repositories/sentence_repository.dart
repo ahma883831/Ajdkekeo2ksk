@@ -10,6 +10,16 @@ class SentenceRepository {
   List<Sentence> getAll() => _box.values.toList()
     ..sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
 
+  /// All distinct, non-empty folder names currently in use, sorted A-Z.
+  List<String> getFolders() {
+    final names = _box.values.map((s) => s.folder).where((f) => f.trim().isNotEmpty).toSet().toList();
+    names.sort();
+    return names;
+  }
+
+  List<Sentence> getByFolder(String folder) =>
+      getAll().where((s) => s.folder == folder).toList();
+
   List<Sentence> dueForReview() {
     final now = DateTime.now();
     return _box.values
@@ -17,8 +27,8 @@ class SentenceRepository {
         .toList();
   }
 
-  Future<Sentence> add({required String text, required String meaning, List<String>? tags}) async {
-    final sentence = Sentence(id: _uuid.v4(), text: text, meaning: meaning, tags: tags);
+  Future<Sentence> add({required String text, required String meaning, List<String>? tags, String folder = ''}) async {
+    final sentence = Sentence(id: _uuid.v4(), text: text, meaning: meaning, tags: tags, folder: folder);
     await _box.put(sentence.id, sentence);
     return sentence;
   }
